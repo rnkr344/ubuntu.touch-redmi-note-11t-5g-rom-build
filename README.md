@@ -36,7 +36,6 @@ You don't need a high-end PC to build this ROM. You can trigger the build direct
 5.  Click the **Run workflow** dropdown button on the right side.
 6.  Click the green **Run workflow** button to start the build.
 
-> ⏱️ **Note:** The complete sync and build process can take anywhere between 3 to 5 hours depending on GitHub's runner availability.
 
 ---
 
