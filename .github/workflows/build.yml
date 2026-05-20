@@ -1,130 +1,82 @@
-name: Ubuntu Touch (Halium 11) Build for Redmi Note 11T 5G
+name: Ubuntu Touch Halium 11 Build for Redmi Note 11T 5G
 
 on:
-  workflow_dispatch:
+  workflow_dispatch: # इसे आप GitHub Actions टैब से मैनुअली रन कर सकते हैं
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-20.04
+    permissions:
+      contents: write
+
     steps:
-    - name: Checkout Repository
-      uses: actions/checkout@v4
+      # स्टेप 1: अपनी रिपॉजिटरी के कोड को रनर पर लाना
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
-    - name: Free Up Disk Space (Maximize Space)
-      uses: easimon/maximize-build-space@master
-      with:
-        root-reserve-mb: 30720
-        swap-size-mb: 1024
-        remove-dotnet: 'true'
-        remove-android: 'true'
-        remove-haskell: 'true'
-        remove-codeql: 'true'
-        remove-docker-images: 'true'
+      # स्टेप 2: गिट कॉन्फ़िगर करना (Repo टूल के लिए ज़रूरी है)
+      - name: Configure Git
+        run: |
+          git config --global user.name "GitHub Action"
+          git config --global user.email "action@github.com"
 
-    - name: Install Build Dependencies
-      run: |
-        sudo apt update
-        sudo apt install -y bc bison build-essential ccache curl flex g++-multilib \
-        gcc-multilib git gnupg gperf imagemagick lib32readline-dev lib32z1-dev \
-        liblz4-tool libncurses5-dev libsdl1.2-dev libssl-dev libxml2 libxml2-utils \
-        lzop pngcrush rsync schedtool squashfs-tools xsltproc zip zlib1g-dev \
-        openjdk-11-jdk python3 python-is-python3 libffi-dev libssl-dev
-        
-        git config --global user.name "rnkr344"
-        git config --global user.email "rnkr344@gmail.com"
+      # स्टेप 3: डिस्क स्पेस खाली करना (Maximize Disk Space)
+      - name: Free Disk Space (Clean Runner)
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /usr/share/swift
+          echo "Disks space after cleanup:"
+          df -h
 
-    - name: Download & Install Repo Tool Globals
-      run: |
-        sudo curl https://storage.googleapis.com/git-repo-downloads/repo -o /usr/local/bin/repo
-        sudo chmod a+rx /usr/local/bin/repo
+      # स्टेप 4: बिल्ड के लिए ज़रूरी टूल्स और डिपेंडेंसीज इंस्टॉल करना
+      - name: Install Build Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git-core gnupg flex bison gperf build-essential zip curl zlib1g-dev gcc-multilib g++-multilib libc6-dev-i386 lib32ncurses5-dev x11proto-core-dev libx11-dev lib32z-dev ccache libgl1-mesa-dev libxml2-utils xsltproc unzip python3 bc
 
-    - name: Initialize Halium Source Tree
-      run: |
-        mkdir -p ${{ github.workspace }}/halium
-        cd ${{ github.workspace }}/halium
-        repo init -u https://github.com/Halium/android -b halium-11.0 --depth=1
-        
-    - name: Configure Local Manifest (Exact Branches Locked)
-      run: |
-        cd ${{ github.workspace }}/halium
-        mkdir -p .repo/local_manifests
-        
-        cat <<EOF > .repo/local_manifests/evergo.xml
-        <?xml version="1.0" encoding="UTF-8"?>
-        <manifest>
-          <project path="device/xiaomi/evergo" name="rnkr344/android_device_xiaomi_evergo" remote="github" revision="arrow-12.1-wip" />
-          <project path="kernel/xiaomi/evergo" name="rnkr344/android_kernel_xiaomi_evergo" remote="github" revision="Master" />
-          <project path="vendor/xiaomi/evergo" name="rnkr344/android_vendor_xiaomi_evergo" remote="github" revision="Master" />
-        </manifest>
-        EOF
+      # स्टेप 5: Google Repo टूल को इंस्टॉल करना
+      - name: Install Google Repo Tool
+        run: |
+          mkdir -p ~/bin
+          curl https://storage.googleapis.com/git-repo-downloads/repo > ~/bin/repo
+          chmod a+x ~/bin/repo
+          sudo ln -sf ~/bin/repo /usr/bin/repo
 
-    - name: Repo Sync Sources
-      run: |
-        cd ${{ github.workspace }}/halium
-        repo sync -c -j$(nproc --all) --force-sync --no-clone-bundle --no-tags
+      # स्टेप 6: Halium 11 सोर्स कोड को इनिशियलाइज़ और सिंक करना
+      - name: Download Halium 11 Source Code
+        run: |
+          mkdir -p halium
+          cd halium
+          # Halium 11 का मुख्य मैनिफ़ेस्ट इनिशियलाइज़ करें
+          repo init -u https://github.com/Halium/android -b halium-11.0 --depth=1
+          
+          # यहाँ अपने Redmi Note 11T 5G के डिवाइस ट्री जोड़ने का कोड लिखें (यदि कोई लोकल मैनिफ़ेस्ट है)
+          # उदाहरण: कर्नल और डिवाइस सोर्स सिंक करना
+          
+          echo "Syncing source code..."
+          repo sync -c -j$(nproc --all) --force-sync --no-clone-bundle --no-tags
 
-    - name: Setup Build Environment & Fix Product Specs
-      run: |
-        cd ${{ github.workspace }}/halium
-        
-        # 1. वेंडर ट्री पैचिंग प्रक्रिया (New Fix)
-        if [ -d vendor/xiaomi/evergo ]; then
-          cd vendor/xiaomi/evergo
-          # अगर evergo-vendor.mk गायब है तो everpal-vendor.mk का इस्तेमाल करें
-          if [ ! -f evergo-vendor.mk ] && [ -f everpal-vendor.mk ]; then
-            cp everpal-vendor.mk evergo-vendor.mk
-          fi
-          # वेंडर फ़ाइलों के अंदर भी नाम दुरुस्त करें
-          find . -type f -name "*.mk" -exec sed -i 's/everpal/evergo/g' {} +
-          cd ${{ github.workspace }}/halium
-        fi
-        
-        # 2. डिवाइस ट्री पैचिंग प्रक्रिया
-        cd device/xiaomi/evergo
-        
-        # मुख्य मेकफ़ाइल का बैकअप और निर्माण
-        find . -maxdepth 1 -name "*.mk" ! -name "Android*" ! -name "CleanSpec*" -exec cp {} halium_evergo.mk \; 2>/dev/null || true
-        
-        if [ ! -f device.mk ]; then
-          if [ -f evergo.mk ]; then
-            cp evergo.mk device.mk
-          elif [ -f everpal.mk ]; then
-            cp everpal.mk device.mk
-          else
-            cp halium_evergo.mk device.mk
-          fi
-        fi
-        
-        # सभी फाइलों के अंदर पुराने कोडनेम रिप्लेस करना
-        find . -type f -name "*.mk" -exec sed -i 's/arrow_everpal/halium_evergo/g' {} +
-        find . -type f -name "*.mk" -exec sed -i 's/lineage_everpal/halium_evergo/g' {} +
-        find . -type f -name "*.mk" -exec sed -i 's/arrow_evergo/halium_evergo/g' {} +
-        find . -type f -name "*.mk" -exec sed -i 's/lineage_evergo/halium_evergo/g' {} +
-        find . -type f -name "*.mk" -exec sed -i 's/everpal/evergo/g' {} +
-        
-        # गायब 'sepolicy_vndr' वाली एरर का बाईपास
-        find . -type f -name "*.mk" -exec sed -i 's|.*device/mediatek/sepolicy_vndr/SEPolicy.mk.*|# mt9629 sepolicy bypassed|g' {} +
-        
-        # AndroidProducts.mk को री-लिंक करना
-        if [ -f AndroidProducts.mk ]; then
-          sed -i 's/\$(LOCAL_DIR)\/.*\.mk/\$(LOCAL_DIR)\/halium_evergo.mk/g' AndroidProducts.mk
-        fi
-        
-        # 3. बिल्ड प्रक्रिया शुरू करना
-        cd ${{ github.workspace }}/halium
-        export USE_CCACHE=1
-        export CCACHE_EXEC=/usr/bin/ccache
-        source build/envsetup.sh
-        
-        lunch halium_evergo-userdebug
-        
-        make -j$(nproc --all) halium-boot
-        make -j$(nproc --all) systemimage
+      # स्टेप 7: कर्नल और हलियम बूट इमेज का निर्माण (Build Process)
+      - name: Build Halium Boot
+        run: |
+          cd halium
+          # एनवायरनमेंट सेटअप स्क्रिप्ट को सोर्स करें
+          source build/envsetup.sh
+          
+          # अपने डिवाइस (evergo) के लिए लंच (lunch) कमांड रन करें
+          # नोट: यदि आपका डिवाइस नाम अलग है तो 'evergo' को बदलें
+          lunch halium_evergo-userdebug || lunch aosp_evergo-userdebug
+          
+          # बूट इमेज और कर्नल बिल्ड करें
+          make halium-boot -j$(nproc --all)
 
-    - name: Upload Build Artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: UT-Halium-Evergo-Build
-        path: |
-          ${{ github.workspace }}/halium/out/target/product/evergo/halium-boot.img
-          ${{ github.workspace }}/halium/out/target/product/evergo/system.img
+      # स्टेप 8: बनी हुई इमेजेस (.img) को GitHub पर अपलोड करना
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Halium-11-UbuntuTouch-RedmiNote11T
+          path: |
+            halium/out/target/product/*/halium-boot.img
+            halium/out/target/product/*/boot.img
