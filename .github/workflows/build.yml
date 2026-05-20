@@ -13,7 +13,7 @@ jobs:
     - name: Free Up Disk Space (Maximize Space)
       uses: easimon/maximize-build-space@master
       with:
-        root-reserve-mb: 30720
+        root-reserve-mb: 30720 # dependencies install के लिए 30GB सुरक्षित
         swap-size-mb: 1024
         remove-dotnet: 'true'
         remove-android: 'true'
@@ -44,17 +44,20 @@ jobs:
         cd ${{ github.workspace }}/halium
         repo init -u https://github.com/Halium/android -b halium-11.0 --depth=1
         
-    - name: Configure Local Manifest (rnkr344 Repositories)
+    - name: Configure Local Manifest (Exact Branches Locked)
       run: |
         cd ${{ github.workspace }}/halium
         mkdir -p .repo/local_manifests
         
+        # आपकी तीनों रिपॉजिटरीज की रियल ब्रांचेस यहाँ सेट कर दी गई हैं
         cat <<EOF > .repo/local_manifests/evergo.xml
         <?xml version="1.0" encoding="UTF-8"?>
         <manifest>
-          <project path="device/xiaomi/evergo" name="rnkr344/android_device_xiaomi_evergo" remote="github" revision="main" />
-          <project path="kernel/xiaomi/evergo" name="rnkr344/android_kernel_xiaomi_evergo" remote="github" revision="main" />
-          <project path="vendor/xiaomi/evergo" name="rnkr344/android_vendor_xiaomi_evergo" remote="github" revision="main" />
+          <project path="device/xiaomi/evergo" name="rnkr344/android_device_xiaomi_evergo" remote="github" revision="arrow-12.1-wip" />
+          
+          <project path="kernel/xiaomi/evergo" name="rnkr344/android_kernel_xiaomi_evergo" remote="github" revision="Master" />
+          
+          <project path="vendor/xiaomi/evergo" name="rnkr344/android_vendor_xiaomi_evergo" remote="github" revision="Master" />
         </manifest>
         EOF
 
@@ -70,7 +73,8 @@ jobs:
         export CCACHE_EXEC=/usr/bin/ccache
         source build/envsetup.sh
         
-        lunch halium_evergo-userdebug
+        # एवरगो कॉन्फ़िगरेशन को लंच करें
+        lunch halium_evergo-userdebug || lunch halium_everpal-userdebug
         
         make -j$(nproc --all) halium-boot
         make -j$(nproc --all) systemimage
@@ -82,3 +86,5 @@ jobs:
         path: |
           ${{ github.workspace }}/halium/out/target/product/evergo/halium-boot.img
           ${{ github.workspace }}/halium/out/target/product/evergo/system.img
+          ${{ github.workspace }}/halium/out/target/product/everpal/halium-boot.img
+          ${{ github.workspace }}/halium/out/target/product/everpal/system.img
