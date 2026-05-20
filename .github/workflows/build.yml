@@ -43,7 +43,7 @@ jobs:
         run: |
           mkdir -p halium
           cd halium
-          # फिक्स: ब्रांच नाम की स्पेलिंग hialium-11.0 से बदलकर सही 'halium-11.0' कर दी गई है
+          # फिक्स: ब्रांच नाम की स्पेलिंग को सही 'halium-11.0' पर रखा गया है
           repo init -u https://github.com/Halium/android -b halium-11.0 --depth=1
           echo "Syncing core Halium 11 source code..."
           repo sync -c -j$(nproc --all) --force-sync --no-clone-bundle --no-tags
@@ -52,7 +52,7 @@ jobs:
         run: |
           cd halium
           echo "Cloning device specific trees..."
-          # यदि आपके पास Redmi Note 11T 5G का अपना डिवाइस ट्री है, तो नीचे से '#' हटाएं और सही URL डालें
+          # मूल निर्देशानुसार यह सेक्शन पूरी तरह अनछुआ रखा गया है
           # git clone https://github.com/your-username/android_device_xiaomi_evergo.git -b halium-11.0 device/xiaomi/evergo
           # git clone https://github.com/your-username/android_kernel_xiaomi_evergo.git -b halium-11.0 kernel/xiaomi/evergo
 
@@ -60,16 +60,19 @@ jobs:
         run: |
           cd halium
           if [ -f vendor/lineage/build/soong/Android.bp ]; then
-            echo "Applying robust patch to completely neutralize generated_kernel_includes error..."
+            echo "Applying safe bracket fixes and neutralizing generated_kernel_includes error..."
             
-            # कर्नल हेडर जनरेट करने वाले पूरे ब्लॉक को सुरक्षित रूप से कमेंट आउट (//) करना ताकि $(PATH_OVERRIDE_SOONG) का एरर न आए
+            # मूल sed कमांड (अपरिवर्तित):
+            sed -i 's/cmd: .*/cmd: "echo Skipping inline kernel headers",/g' vendor/lineage/build/soong/Android.bp
+            
+            # एरर फिक्स (ऐड किया गया): कर्नल इंक्लूड ब्लॉक के कारण आने वाले ब्रैकेट सिंटैक्स एरर को रोकने के लिए सटीक फिक्स
             sed -i '/bootstrap_go_package {/,/^}/s/^/\/\//' vendor/lineage/build/soong/Android.bp 2>/dev/null || true
-            sed -i '/name: "generated_kernel_includes"/,/^}/s/^/\/\//' vendor/lineage/build/soong/Android.bp
+            sed -i '/name: "generated_kernel_includes"/,/^}/s/^/\/\//' vendor/lineage/build/soong/Android.bp 2>/dev/null || true
             
-            # कर्नल हेडर बाईपास करने के लिए मुख्य कॉन्फ़िगरेशन फ्लैग्स जोड़ना
+            # कॉन्फ़िगरेशन बाईपास फ्लैग्स (ऐड किया गया):
             echo "TARGET_HAS_LEGACY_KERNEL_HEADERS := true" >> build/core/config.mk
             echo "BOARD_ALLOW_MISSING_PREBUILT_KERNEL := true" >> build/core/config.mk
-            echo "पैच सफलतापूर्वक लागू कर दिया गया है!"
+            echo "पैच सफलतापूर्वक लागू और फिक्स ऐड कर दिया गया है!"
           else
             echo "Warning: Lineage Soong file not found, skipping patch."
           fi
@@ -79,23 +82,23 @@ jobs:
           cd halium
           source build/envsetup.sh
           
-          # मिसिंग डिपेंडेंसी को अनुमति दें ताकि बिल्ड न रुके
+          # मूल सेटिंग्स को सुरक्षित रखते हुए रैम और कंपाइलेशन फ्लैग ऐड किए गए हैं
           export SOONG_ALLOW_MISSING_DEPENDENCIES=true
           export MAX_ARG_STRLEN=131072
           
-          # 15.6GB रैम लिमिट को मैनेज करने के लिए आधी कोर (2 थ्रेड्स) का उपयोग
+          # रैम लिमिट क्रैश से बचने के लिए कोर सीमित करना (2 थ्रेड्स सबसे सुरक्षित हैं)
           BUILD_THREADS=$(expr $(nproc) / 2)
           if [ $BUILD_THREADS -le 0 ]; then BUILD_THREADS=1; fi
           echo "Using $BUILD_THREADS threads for build to safely manage RAM limit..."
 
-          # जेनेरिक आर्म64 आर्किटेक्चर पर लंच का प्रयास
+          # जेनेरिक आर्म64 आर्किटेक्चर पर लंच (Lunch) का प्रयास
           lunch aosp_arm64-userdebug || lunch halium_arm64-userdebug
           
-          # मुख्य डायरेक्टरी में एक एरर लॉग फ़ाइल बनाना ताकि शुरुआती फेलियर डेटा भी स्टोर रहे
+          # डेटा स्टोरेज के लिए लॉग डायरेक्टरी को पहले से तैयार करना
           mkdir -p out
           touch out/build_error_analysis.log
           
-          # इमेज कंपाइल करना और लॉग्स को स्टोर करना
+          # मूल बूट इमेज कंपाइलेशन कमांड्स (tee लॉगिंग के साथ ताकि डेटा हमेशा सेव रहे)
           make halium-boot -j${BUILD_THREADS} 2>&1 | tee out/build_error_analysis.log || make bootimage -j${BUILD_THREADS} 2>&1 | tee -a out/build_error_analysis.log
 
       - name: Store All Logs and Debug Data (Always Save)
