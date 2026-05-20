@@ -38,7 +38,7 @@ jobs:
           chmod a+x ~/bin/repo
           sudo ln -sf ~/bin/repo /usr/bin/repo
 
-      # स्टेप 6: इसमें हमने आपके डिवाइस के लिए ऑटोमैटिकली सोर्स क्लोन करने का कोड डाल दिया है
+      # स्टेप 6: सुधरा हुआ सोर्स डाउनलोड और मैनिफ़ेस्ट क्रिएशन
       - name: Download Halium 11 Source Code
         run: |
           mkdir -p halium
@@ -46,11 +46,20 @@ jobs:
           # 1. मुख्य हलियम 11 सोर्स इनिशियलाइज़ करें
           repo init -u https://github.com/Halium/android -b halium-11.0 --depth=1
           
-          # 2. आपके डिवाइस (Redmi Note 11T 5G) के लिए डिवाइस ट्री, कर्नल और हार्डवेयर सोर्स क्लोन करना
-          git clone https://github.com/rnkr344/android_device_xiaomi_evergo.git -b android-11 device/xiaomi/evergo || git clone https://github.com/LineageOS/android_device_xiaomi_evergo.git -b lineage-18.1 device/xiaomi/evergo
-          git clone https://github.com/rnkr344/android_kernel_xiaomi_evergo.git -b android-11 kernel/xiaomi/evergo || git clone https://github.com/LineageOS/android_kernel_xiaomi_evergo.git -b lineage-18.1 kernel/xiaomi/evergo
+          # 2. लोकल मैनिफ़ेस्ट फ़ोल्डर बनाना
+          mkdir -p .repo/local_manifests
           
-          echo "Syncing base Halium source code..."
+          # 3. स्वचालित रूप से डिवाइस और कर्नल सोर्स को मैनिफ़ेस्ट में लिखना (Correct Manifest Entry)
+          # यहाँ हम कम्युनिटी के सबसे स्थिर सोर्स का पाथ जोड़ रहे हैं
+          cat <<EOF > .repo/local_manifests/roomservice.xml
+          <?xml version="1.0" encoding="UTF-8"?>
+          <manifest>
+            <project name="Halium-Xiaomi-MT6833/android_device_xiaomi_evergo" path="device/xiaomi/evergo" remote="github" revision="halium-11" />
+            <project name="Halium-Xiaomi-MT6833/android_kernel_xiaomi_evergo" path="kernel/xiaomi/evergo" remote="github" revision="halium-11" />
+          </manifest>
+          EOF
+          
+          echo "Syncing all source code with proper manifests..."
           repo sync -c -j$(nproc --all) --force-sync --no-clone-bundle --no-tags
 
       - name: Build Halium Boot
@@ -58,8 +67,8 @@ jobs:
           cd halium
           source build/envsetup.sh
           
-          # लंच कमांड सेटअप - कस्टमाइज्ड या डिफॉल्ट aosp/lineage
-          lunch halium_evergo-userdebug || lunch lineage_evergo-userdebug || lunch aosp_evergo-userdebug
+          # सही लंच कमांड टारगेट करना
+          lunch halium_evergo-userdebug || lunch aosp_evergo-userdebug
           
           make halium-boot -j$(nproc --all)
 
