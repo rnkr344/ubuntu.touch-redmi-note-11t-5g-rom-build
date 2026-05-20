@@ -43,8 +43,8 @@ jobs:
         run: |
           mkdir -p halium
           cd halium
-          # मुख्य हैलियम 11 बेस सोर्स को इनिशियलाइज करना
-          repo init -u https://github.com/Halium/android -b hialium-11.0 --depth=1
+          # फिक्स: ब्रांच नाम की स्पेलिंग hialium-11.0 से बदलकर सही 'halium-11.0' कर दी गई है
+          repo init -u https://github.com/Halium/android -b halium-11.0 --depth=1
           echo "Syncing core Halium 11 source code..."
           repo sync -c -j$(nproc --all) --force-sync --no-clone-bundle --no-tags
 
@@ -52,7 +52,7 @@ jobs:
         run: |
           cd halium
           echo "Cloning device specific trees..."
-          # यदि आपके पास अपना काम करने वाला डिवाइस ट्री है, तो नीचे की लाइनों से '#' हटाएं और सही लिंक डालें
+          # यदि आपके पास Redmi Note 11T 5G का अपना डिवाइस ट्री है, तो नीचे से '#' हटाएं और सही URL डालें
           # git clone https://github.com/your-username/android_device_xiaomi_evergo.git -b halium-11.0 device/xiaomi/evergo
           # git clone https://github.com/your-username/android_kernel_xiaomi_evergo.git -b halium-11.0 kernel/xiaomi/evergo
 
@@ -62,15 +62,14 @@ jobs:
           if [ -f vendor/lineage/build/soong/Android.bp ]; then
             echo "Applying robust patch to completely neutralize generated_kernel_includes error..."
             
-            # सिर्फ एक लाइन बदलने के बजाय, हम 'generated_kernel_includes' वाले पूरे मॉड्यूल ब्लॉक को कमेंट आउट (//) कर रहे हैं
-            # इससे PATH_OVERRIDE_SOONG का एरर पूरी तरह खत्म हो जाएगा क्योंकि सोोंग इस मॉड्यूल को रीड ही नहीं करेगा
+            # कर्नल हेडर जनरेट करने वाले पूरे ब्लॉक को सुरक्षित रूप से कमेंट आउट (//) करना ताकि $(PATH_OVERRIDE_SOONG) का एरर न आए
             sed -i '/bootstrap_go_package {/,/^}/s/^/\/\//' vendor/lineage/build/soong/Android.bp 2>/dev/null || true
             sed -i '/name: "generated_kernel_includes"/,/^}/s/^/\/\//' vendor/lineage/build/soong/Android.bp
             
-            # कर्नल हेडर चेकिंग को ग्लोबल लेवल पर बायपास करने के लिए फ्लैग्स जोड़ना
+            # कर्नल हेडर बाईपास करने के लिए मुख्य कॉन्फ़िगरेशन फ्लैग्स जोड़ना
             echo "TARGET_HAS_LEGACY_KERNEL_HEADERS := true" >> build/core/config.mk
             echo "BOARD_ALLOW_MISSING_PREBUILT_KERNEL := true" >> build/core/config.mk
-            echo "पैच पूरी तरह और सुरक्षित रूप से लागू कर दिया गया है!"
+            echo "पैच सफलतापूर्वक लागू कर दिया गया है!"
           else
             echo "Warning: Lineage Soong file not found, skipping patch."
           fi
@@ -80,11 +79,11 @@ jobs:
           cd halium
           source build/envsetup.sh
           
-          # कम रैम और जेनेरिक एनवायरनमेंट के लिए वेरिएबल्स सेट करना
+          # मिसिंग डिपेंडेंसी को अनुमति दें ताकि बिल्ड न रुके
           export SOONG_ALLOW_MISSING_DEPENDENCIES=true
           export MAX_ARG_STRLEN=131072
           
-          # रैम लिमिट क्रैश से बचने के लिए कोर सीमित करना (15.6GB रैम के लिए 2 थ्रेड्स सुरक्षित हैं)
+          # 15.6GB रैम लिमिट को मैनेज करने के लिए आधी कोर (2 थ्रेड्स) का उपयोग
           BUILD_THREADS=$(expr $(nproc) / 2)
           if [ $BUILD_THREADS -le 0 ]; then BUILD_THREADS=1; fi
           echo "Using $BUILD_THREADS threads for build to safely manage RAM limit..."
@@ -92,7 +91,11 @@ jobs:
           # जेनेरिक आर्म64 आर्किटेक्चर पर लंच का प्रयास
           lunch aosp_arm64-userdebug || lunch halium_arm64-userdebug
           
-          # इमेज कंपाइल करना और एरर को लॉग फाइल में स्टोर करना ताकि डेटा सेव रहे
+          # मुख्य डायरेक्टरी में एक एरर लॉग फ़ाइल बनाना ताकि शुरुआती फेलियर डेटा भी स्टोर रहे
+          mkdir -p out
+          touch out/build_error_analysis.log
+          
+          # इमेज कंपाइल करना और लॉग्स को स्टोर करना
           make halium-boot -j${BUILD_THREADS} 2>&1 | tee out/build_error_analysis.log || make bootimage -j${BUILD_THREADS} 2>&1 | tee -a out/build_error_analysis.log
 
       - name: Store All Logs and Debug Data (Always Save)
@@ -107,7 +110,6 @@ jobs:
           if-no-files-found: ignore
 
       - name: Upload Build Artifacts (Only on Success)
-        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: Halium-11-UbuntuTouch-Generic-ARM64
