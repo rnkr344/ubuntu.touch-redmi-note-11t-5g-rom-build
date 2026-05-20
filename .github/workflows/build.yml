@@ -24,6 +24,7 @@ jobs:
           sudo rm -rf /usr/local/lib/android
           sudo rm -rf /opt/ghc
           sudo rm -rf /usr/share/swift
+          echo "=== उपलब्ध स्टोरेज ==="
           df -h
 
       - name: Install Build Dependencies
@@ -42,17 +43,19 @@ jobs:
         run: |
           mkdir -p halium
           cd halium
+          # मुख्य हैलियम 11 बेस सोर्स को इनिशियलाइज करना (बिना किसी अप्रचलित फ्लैग के)
           repo init -u https://github.com/Halium/android -b halium-11.0 --depth=1
           echo "Syncing core Halium 11 source code..."
           repo sync -c -j$(nproc --all) --force-sync --no-clone-bundle --no-tags
 
-      - name: Patch Lineage Soong Bug
+      - name: Patch Lineage Soong Bug (Master Model Patch)
         run: |
           cd halium
           if [ -f vendor/lineage/build/soong/Android.bp ]; then
-            echo "Applying full block patch to avoid uninitialized kernel variables..."
-            # यह कमांड विवादित cmd वाले पूरे हिस्से को बदलकर न्यूट्रल कर देगी ताकि TARGET_KERNEL_SOURCE एरर न आए
+            echo "Applying final command block patch to neutralize uninitialized kernel variables..."
+            # यह कमांड सोोंग के कर्नल वेरिएबल वाले एरर लूप को पूरी तरह समाप्त कर देगी
             sed -i 's/cmd: .*/cmd: "echo Skipping inline kernel headers",/g' vendor/lineage/build/soong/Android.bp
+            echo "पैच सफलतापूर्वक लागू किया गया!"
           else
             echo "Warning: Lineage Soong file not found, skipping patch."
           fi
@@ -61,9 +64,9 @@ jobs:
         run: |
           cd halium
           source build/envsetup.sh
-          # जेनेरिक आर्म64 आर्किटेक्चर पर लंच का प्रयास करें
+          # जेनेरिक आर्म64 आर्किटेक्चर पर लंच (Lunch) का प्रयास
           lunch aosp_arm64-userdebug || lunch halium_arm64-userdebug
-          # जेनेरिक बूट इमेज कंपाइल करें
+          # जेनेरिक बूट इमेज कंपाइल करना
           make halium-boot -j$(nproc --all) || make bootimage -j$(nproc --all)
 
       - name: Upload Build Artifacts
