@@ -1,27 +1,26 @@
 name: Ubuntu Touch Halium 11 Build for Redmi Note 11T 5G
 
 on:
-  workflow_dispatch: # इसे आप GitHub UI से जब चाहें मैन्युअली रन कर सकते हैं
+  workflow_dispatch: # मैन्युअल रूप से चलाने के लिए
 
 jobs:
   build:
-    # रनर समस्या को ठीक करने के लिए ubuntu-latest का उपयोग किया गया है
     runs-on: ubuntu-latest
     permissions:
       contents: write
 
     steps:
-      # स्टेप 1: आपके रिपॉजिटरी के कोड को GitHub रनर पर क्लोन/चेकआउट करना
+      # स्टेप 1: कोड चेकआउट करना
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # स्टेप 2: Git को कॉन्फ़िगर करना (यह 'repo' टूल के काम करने के लिए ज़रूरी है)
+      # स्टेप 2: Git कॉन्फ़िगर करना
       - name: Configure Git
         run: |
           git config --global user.name "GitHub Action"
           git config --global user.email "action@github.com"
 
-      # स्टेप 3: GitHub सर्वर से गैर-ज़रूरी फाइल्स डिलीट करके 30GB+ स्पेस खाली करना
+      # स्टेप 3: स्टोरेज खाली करना
       - name: Free Disk Space (Maximize Storage)
         run: |
           sudo rm -rf /usr/share/dotnet
@@ -31,13 +30,13 @@ jobs:
           echo "Disk space after cleanup:"
           df -h
 
-      # स्टेप 4: Ubuntu पर Android/Halium कंपाइल करने के लिए सभी आवश्यक टूल्स डालना
+      # स्टेप 4: बिल्ड डिपेंडेंसीज इंस्टॉल करना (सुधरा हुआ भाग)
       - name: Install Build Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y git-core gnupg flex bison gperf build-essential zip curl zlib1g-dev gcc-multilib g++-multilib libc6-dev-i386 lib32ncurses5-dev x11proto-core-dev libx11-dev lib32z-dev ccache libgl1-mesa-dev libxml2-utils xsltproc unzip python3 bc rs_sync libssl-dev
+          sudo apt-get install -y git-core gnupg flex bison gperf build-essential zip curl zlib1g-dev gcc-multilib g++-multilib libc6-dev-i386 libncurses5-dev libncurses-dev x11proto-core-dev libx11-dev lib32z-dev ccache libgl1-mesa-dev libxml2-utils xsltproc unzip python3 bc rsync libssl-dev
 
-      # स्टेप 5: Google का 'repo' टूल इंस्टॉल करना (Android सोर्स मैनेज करने के लिए)
+      # स्टेप 5: Google Repo टूल डालना
       - name: Install Google Repo Tool
         run: |
           mkdir -p ~/bin
@@ -45,35 +44,24 @@ jobs:
           chmod a+x ~/bin/repo
           sudo ln -sf ~/bin/repo /usr/bin/repo
 
-      # स्टेप 6: Halium 11 का मुख्य सोर्स कोड इनिशियलाइज़ और डाउनलोड करना
+      # स्टेप 6: Halium 11 सोर्स कोड डाउनलोड करना
       - name: Download Halium 11 Source Code
         run: |
           mkdir -p halium
           cd halium
-          # Halium 11 का मैनिफ़ेस्ट सेट करना
           repo init -u https://github.com/Halium/android -b halium-11.0 --depth=1
-          
-          # नोट: यदि आपके पास अपना लोकल मैनिफ़ेस्ट (Redmi Note 11T ट्री) है, तो उसे यहाँ क्लोन करें:
-          # उदाहरण: git clone https://github.com/your-username/local_manifests .repo/local_manifests
-          
           echo "Syncing source code..."
           repo sync -c -j$(nproc --all) --force-sync --no-clone-bundle --no-tags
 
-      # स्टेप 7: एनवायरनमेंट सेट करके कर्नल और बूट इमेज का निर्माण करना
+      # ्टेप 7: कर्नल और बूट इमेज बिल्ड करना
       - name: Build Halium Boot
         run: |
           cd halium
-          # बिल्ड एनवायरनमेंट स्क्रिप्ट लोड करें
           source build/envsetup.sh
-          
-          # अपने डिवाइस (evergo/opal) के लिए लंच सेटअप करें
-          # यदि आपके डिवाइस का सटीक लंच कॉम्बो अलग है तो इसे बदल सकते हैं
           lunch halium_evergo-userdebug || lunch aosp_evergo-userdebug
-          
-          # कर्नल और बूट इमेज कंपाइल करें
           make halium-boot -j$(nproc --all)
 
-      # स्टेप 8: तैयार हुई आउटपुट इमेजेस (.img) को सुरक्षित डाउनलोड के लिए अपलोड करना
+      # स्टेप 8: बनी हुई फाइल्स अपलोड करना
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
