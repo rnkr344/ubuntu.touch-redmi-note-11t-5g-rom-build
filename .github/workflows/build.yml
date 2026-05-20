@@ -1,11 +1,11 @@
 name: Ubuntu Touch (Halium 11) Build for Redmi Note 11T 5G
 
 on:
-  workflow_dispatch: # इसे आप GitHub UI से मैन्युअली स्टार्ट कर सकते हैं
+  workflow_dispatch:
 
 jobs:
   build:
-    runs-on: ubuntu-22.04 # यह रनर बिना कतार के तुरंत अलॉट होता है
+    runs-on: ubuntu-22.04
     steps:
     - name: Checkout Repository
       uses: actions/checkout@v4
@@ -13,7 +13,7 @@ jobs:
     - name: Free Up Disk Space (Maximize Space)
       uses: easimon/maximize-build-space@master
       with:
-        root-reserve-mb: 30720 # dependencies install के लिए 30GB सुरक्षित ताकि apt fail न हो
+        root-reserve-mb: 30720
         swap-size-mb: 1024
         remove-dotnet: 'true'
         remove-android: 'true'
@@ -30,7 +30,6 @@ jobs:
         lzop pngcrush rsync schedtool squashfs-tools xsltproc zip zlib1g-dev \
         openjdk-11-jdk python3 python-is-python3 libffi-dev libssl-dev
         
-        # Git Configuration
         git config --global user.name "rnkr344"
         git config --global user.email "rnkr344@gmail.com"
 
@@ -50,14 +49,11 @@ jobs:
         cd ${{ github.workspace }}/halium
         mkdir -p .repo/local_manifests
         
-        # आपकी तीनों रिपॉजिटरीज की रियल ब्रांचेस यहाँ सेट कर दी गई हैं
         cat <<EOF > .repo/local_manifests/evergo.xml
         <?xml version="1.0" encoding="UTF-8"?>
         <manifest>
           <project path="device/xiaomi/evergo" name="rnkr344/android_device_xiaomi_evergo" remote="github" revision="arrow-12.1-wip" />
-          
           <project path="kernel/xiaomi/evergo" name="rnkr344/android_kernel_xiaomi_evergo" remote="github" revision="Master" />
-          
           <project path="vendor/xiaomi/evergo" name="rnkr344/android_vendor_xiaomi_evergo" remote="github" revision="Master" />
         </manifest>
         EOF
@@ -71,34 +67,44 @@ jobs:
       run: |
         cd ${{ github.workspace }}/halium
         
-        # 1. डिवाइस ट्री के अंदर मेकफाइल्स को ऑटो-पैच और रीनेम करना ताकि Spec Not Found एरर न आए
+        # 1. डिवाइस ट्री पैचिंग और रीनेमिंग प्रक्रिया
         cd device/xiaomi/evergo
         
-        # अगर कोई भी .mk फाइल है (जैसे arrow_everpal.mk), उसे halium_evergo.mk में बदलें
-        find . -maxdepth 1 -name "*.mk" ! -name "Android*" ! -name "CleanSpec*" -exec mv {} halium_evergo.mk \; 2>/dev/null || true
+        # अगर arrow_everpal.mk जैसी कोई मुख्य फ़ाइल है, उसे पहले बैकअप लें
+        find . -maxdepth 1 -name "*.mk" ! -name "Android*" ! -name "CleanSpec*" -exec cp {} halium_evergo.mk \; 2>/dev/null || true
         
-        # फाइलों के अंदर जहाँ भी पुराने प्रोडक्ट नाम या ओएस नाम हैं, उन्हें 'halium_evergo' से रिप्लेस करें
+        # एरर फिक्स: अगर device.mk मौजूद नहीं है, तो उपलब्ध मेकफाइल को ही device.mk बना दें
+        if [ ! -f device.mk ]; then
+          if [ -f evergo.mk ]; then
+            cp evergo.mk device.mk
+          elif [ -f everpal.mk ]; then
+            cp everpal.mk device.mk
+          else
+            # अगर कोई विशिष्ट नाम नहीं मिलता, तो बैकअप फ़ाइल का ही उपयोग करें
+            cp halium_evergo.mk device.mk
+          fi
+        fi
+        
+        # सभी फाइलों के अंदर पुराने कोडनेम और ओएस प्रविष्टियों को 'halium_evergo' से बदलना
         find . -type f -name "*.mk" -exec sed -i 's/arrow_everpal/halium_evergo/g' {} +
         find . -type f -name "*.mk" -exec sed -i 's/lineage_everpal/halium_evergo/g' {} +
         find . -type f -name "*.mk" -exec sed -i 's/arrow_evergo/halium_evergo/g' {} +
         find . -type f -name "*.mk" -exec sed -i 's/lineage_evergo/halium_evergo/g' {} +
         find . -type f -name "*.mk" -exec sed -i 's/everpal/evergo/g' {} +
         
-        # AndroidProducts.mk के अंदर प्रोडक्ट लिंक को सही करना
+        # AndroidProducts.mk को री-लिंक करना
         if [ -f AndroidProducts.mk ]; then
           sed -i 's/\$(LOCAL_DIR)\/.*\.mk/\$(LOCAL_DIR)\/halium_evergo.mk/g' AndroidProducts.mk
         fi
         
-        # 2. वापस मुख्य डायरेक्टरी में आकर बिल्ड प्रक्रिया शुरू करना
+        # 2. बिल्ड एनवायरनमेंट सेट करके लंच और कंपाइल करना
         cd ${{ github.workspace }}/halium
         export USE_CCACHE=1
         export CCACHE_EXEC=/usr/bin/ccache
         source build/envsetup.sh
         
-        # अब यह बिना किसी 'Spec Not Found' एरर के लंच हो जाएगा
         lunch halium_evergo-userdebug
         
-        # Ubuntu Touch इमेजेस बिल्ड करना
         make -j$(nproc --all) halium-boot
         make -j$(nproc --all) systemimage
 
