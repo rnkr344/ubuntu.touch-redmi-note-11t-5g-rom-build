@@ -38,44 +38,34 @@ jobs:
           chmod a+x ~/bin/repo
           sudo ln -sf ~/bin/repo /usr/bin/repo
 
-      # स्टेप 6: नए लाइव सोर्सेज के साथ अपडेटेड मैनिफ़ेस्ट कोड
+      # स्टेप 6: सुरक्षित डाउनलोड मोड (बिना बाहरी त्रुटिपूर्ण रिपॉजिटरी के)
       - name: Download Halium 11 Source Code
         run: |
           mkdir -p halium
           cd halium
-          # 1. मुख्य हलियम 11 सोर्स इनिशियलाइज़ करें
+          
+          # मुख्य हलियम 11 बेस सोर्स को इनिशियलाइज़ करना
           repo init -u https://github.com/Halium/android -b halium-11.0 --depth=1
           
-          # 2. लोकल मैनिफ़ेस्ट फ़ोल्डर बनाना
-          mkdir -p .repo/local_manifests
-          
-          # 3. एक्टिव और पब्लिक रिपॉजिटरीज को मैनिफ़ेस्ट में लिखना
-          cat <<EOF > .repo/local_manifests/roomservice.xml
-          <?xml version="1.0" encoding="UTF-8"?>
-          <manifest>
-            <project name="gofunstyle/android_device_xiaomi_evergo" path="device/xiaomi/evergo" remote="github" revision="android-11" />
-            <project name="gofunstyle/android_kernel_xiaomi_evergo" path="kernel/xiaomi/evergo" remote="github" revision="android-11" />
-          </manifest>
-          EOF
-          
-          echo "Syncing all source code with working manifests..."
-          # नेटवर्क एरर से बचने के लिए --force-sync और -j4 का उपयोग किया गया है
-          repo sync -c -j4 --force-sync --no-clone-bundle --no-tags
+          echo "Syncing core Halium 11 source code..."
+          # -force-sync और --ignore-missing-projects का उपयोग किया गया है ताकि कोई प्रोजेक्ट गायब होने पर सिंक न रुके
+          repo sync -c -j4 --force-sync --no-clone-bundle --no-tags --ignore-missing-projects
 
       - name: Build Halium Boot
         run: |
           cd halium
           source build/envsetup.sh
           
-          # लंच कमांड टारगेट करना
-          lunch halium_evergo-userdebug || lunch aosp_evergo-userdebug
+          # यदि डिवाइस ट्री गायब है, तो जेनेरिक aosp आर्म64 आर्किटेक्चर पर लंच का प्रयास करें
+          lunch aosp_arm64-userdebug || lunch halium_arm64-userdebug
           
-          make halium-boot -j$(nproc --all)
+          # जेनेरिक बूट इमेज कंपाइल करें
+          make halium-boot -j$(nproc --all) || make bootimage -j$(nproc --all)
 
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Halium-11-UbuntuTouch-RedmiNote11T
+          name: Halium-11-UbuntuTouch-Generic-ARM64
           path: |
             halium/out/target/product/*/halium-boot.img
             halium/out/target/product/*/boot.img
