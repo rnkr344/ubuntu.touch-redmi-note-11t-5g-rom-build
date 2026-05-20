@@ -1,7 +1,7 @@
 name: Ubuntu Touch Halium 11 Build for Redmi Note 11T 5G
 
 on:
-  workflow_dispatch: # मैन्युअल रूप से चलाने के लिए
+  workflow_dispatch:
 
 jobs:
   build:
@@ -10,33 +10,27 @@ jobs:
       contents: write
 
     steps:
-      # स्टेप 1: कोड चेकआउट करना
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # स्टेप 2: Git कॉन्फ़िगर करना
       - name: Configure Git
         run: |
           git config --global user.name "GitHub Action"
           git config --global user.email "action@github.com"
 
-      # स्टेप 3: स्टोरेज खाली करना
       - name: Free Disk Space (Maximize Storage)
         run: |
           sudo rm -rf /usr/share/dotnet
           sudo rm -rf /usr/local/lib/android
           sudo rm -rf /opt/ghc
           sudo rm -rf /usr/share/swift
-          echo "Disk space after cleanup:"
           df -h
 
-      # स्टेप 4: बिल्ड डिपेंडेंसीज इंस्टॉल करना (सुधरा हुआ भाग)
       - name: Install Build Dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y git-core gnupg flex bison gperf build-essential zip curl zlib1g-dev gcc-multilib g++-multilib libc6-dev-i386 libncurses5-dev libncurses-dev x11proto-core-dev libx11-dev lib32z-dev ccache libgl1-mesa-dev libxml2-utils xsltproc unzip python3 bc rsync libssl-dev
 
-      # स्टेप 5: Google Repo टूल डालना
       - name: Install Google Repo Tool
         run: |
           mkdir -p ~/bin
@@ -44,24 +38,31 @@ jobs:
           chmod a+x ~/bin/repo
           sudo ln -sf ~/bin/repo /usr/bin/repo
 
-      # स्टेप 6: Halium 11 सोर्स कोड डाउनलोड करना
+      # स्टेप 6: इसमें हमने आपके डिवाइस के लिए ऑटोमैटिकली सोर्स क्लोन करने का कोड डाल दिया है
       - name: Download Halium 11 Source Code
         run: |
           mkdir -p halium
           cd halium
+          # 1. मुख्य हलियम 11 सोर्स इनिशियलाइज़ करें
           repo init -u https://github.com/Halium/android -b halium-11.0 --depth=1
-          echo "Syncing source code..."
+          
+          # 2. आपके डिवाइस (Redmi Note 11T 5G) के लिए डिवाइस ट्री, कर्नल और हार्डवेयर सोर्स क्लोन करना
+          git clone https://github.com/rnkr344/android_device_xiaomi_evergo.git -b android-11 device/xiaomi/evergo || git clone https://github.com/LineageOS/android_device_xiaomi_evergo.git -b lineage-18.1 device/xiaomi/evergo
+          git clone https://github.com/rnkr344/android_kernel_xiaomi_evergo.git -b android-11 kernel/xiaomi/evergo || git clone https://github.com/LineageOS/android_kernel_xiaomi_evergo.git -b lineage-18.1 kernel/xiaomi/evergo
+          
+          echo "Syncing base Halium source code..."
           repo sync -c -j$(nproc --all) --force-sync --no-clone-bundle --no-tags
 
-      # ्टेप 7: कर्नल और बूट इमेज बिल्ड करना
       - name: Build Halium Boot
         run: |
           cd halium
           source build/envsetup.sh
-          lunch halium_evergo-userdebug || lunch aosp_evergo-userdebug
+          
+          # लंच कमांड सेटअप - कस्टमाइज्ड या डिफॉल्ट aosp/lineage
+          lunch halium_evergo-userdebug || lunch lineage_evergo-userdebug || lunch aosp_evergo-userdebug
+          
           make halium-boot -j$(nproc --all)
 
-      # स्टेप 8: बनी हुई फाइल्स अपलोड करना
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
