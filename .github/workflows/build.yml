@@ -1,11 +1,11 @@
 name: Ubuntu Touch (Halium 11) Build for Redmi Note 11T 5G
 
 on:
-  workflow_dispatch:
+  workflow_dispatch: # इसे आप GitHub UI से मैन्युअली स्टार्ट कर सकते हैं
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-22.04 # यह रनर बिना कतार के तुरंत अलॉट होता है
     steps:
     - name: Checkout Repository
       uses: actions/checkout@v4
@@ -13,7 +13,7 @@ jobs:
     - name: Free Up Disk Space (Maximize Space)
       uses: easimon/maximize-build-space@master
       with:
-        root-reserve-mb: 30720 # dependencies install के लिए 30GB सुरक्षित
+        root-reserve-mb: 30720 # dependencies install के लिए 30GB सुरक्षित ताकि apt fail न हो
         swap-size-mb: 1024
         remove-dotnet: 'true'
         remove-android: 'true'
@@ -30,6 +30,7 @@ jobs:
         lzop pngcrush rsync schedtool squashfs-tools xsltproc zip zlib1g-dev \
         openjdk-11-jdk python3 python-is-python3 libffi-dev libssl-dev
         
+        # Git Configuration
         git config --global user.name "rnkr344"
         git config --global user.email "rnkr344@gmail.com"
 
@@ -66,16 +67,38 @@ jobs:
         cd ${{ github.workspace }}/halium
         repo sync -c -j$(nproc --all) --force-sync --no-clone-bundle --no-tags
 
-    - name: Setup Build Environment & Run Build
+    - name: Setup Build Environment & Fix Product Specs
       run: |
+        cd ${{ github.workspace }}/halium
+        
+        # 1. डिवाइस ट्री के अंदर मेकफाइल्स को ऑटो-पैच और रीनेम करना ताकि Spec Not Found एरर न आए
+        cd device/xiaomi/evergo
+        
+        # अगर कोई भी .mk फाइल है (जैसे arrow_everpal.mk), उसे halium_evergo.mk में बदलें
+        find . -maxdepth 1 -name "*.mk" ! -name "Android*" ! -name "CleanSpec*" -exec mv {} halium_evergo.mk \; 2>/dev/null || true
+        
+        # फाइलों के अंदर जहाँ भी पुराने प्रोडक्ट नाम या ओएस नाम हैं, उन्हें 'halium_evergo' से रिप्लेस करें
+        find . -type f -name "*.mk" -exec sed -i 's/arrow_everpal/halium_evergo/g' {} +
+        find . -type f -name "*.mk" -exec sed -i 's/lineage_everpal/halium_evergo/g' {} +
+        find . -type f -name "*.mk" -exec sed -i 's/arrow_evergo/halium_evergo/g' {} +
+        find . -type f -name "*.mk" -exec sed -i 's/lineage_evergo/halium_evergo/g' {} +
+        find . -type f -name "*.mk" -exec sed -i 's/everpal/evergo/g' {} +
+        
+        # AndroidProducts.mk के अंदर प्रोडक्ट लिंक को सही करना
+        if [ -f AndroidProducts.mk ]; then
+          sed -i 's/\$(LOCAL_DIR)\/.*\.mk/\$(LOCAL_DIR)\/halium_evergo.mk/g' AndroidProducts.mk
+        fi
+        
+        # 2. वापस मुख्य डायरेक्टरी में आकर बिल्ड प्रक्रिया शुरू करना
         cd ${{ github.workspace }}/halium
         export USE_CCACHE=1
         export CCACHE_EXEC=/usr/bin/ccache
         source build/envsetup.sh
         
-        # एवरगो कॉन्फ़िगरेशन को लंच करें
-        lunch halium_evergo-userdebug || lunch halium_everpal-userdebug
+        # अब यह बिना किसी 'Spec Not Found' एरर के लंच हो जाएगा
+        lunch halium_evergo-userdebug
         
+        # Ubuntu Touch इमेजेस बिल्ड करना
         make -j$(nproc --all) halium-boot
         make -j$(nproc --all) systemimage
 
@@ -86,5 +109,3 @@ jobs:
         path: |
           ${{ github.workspace }}/halium/out/target/product/evergo/halium-boot.img
           ${{ github.workspace }}/halium/out/target/product/evergo/system.img
-          ${{ github.workspace }}/halium/out/target/product/everpal/halium-boot.img
-          ${{ github.workspace }}/halium/out/target/product/everpal/system.img
