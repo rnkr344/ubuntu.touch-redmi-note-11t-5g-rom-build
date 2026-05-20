@@ -38,7 +38,7 @@ jobs:
           chmod a+x ~/bin/repo
           sudo ln -sf ~/bin/repo /usr/bin/repo
 
-      # स्टेप 6: सुधरा हुआ सोर्स डाउनलोड और मैनिफ़ेस्ट क्रिएशन
+      # स्टेप 6: नए लाइव सोर्सेज के साथ अपडेटेड मैनिफ़ेस्ट कोड
       - name: Download Halium 11 Source Code
         run: |
           mkdir -p halium
@@ -49,25 +49,25 @@ jobs:
           # 2. लोकल मैनिफ़ेस्ट फ़ोल्डर बनाना
           mkdir -p .repo/local_manifests
           
-          # 3. स्वचालित रूप से डिवाइस और कर्नल सोर्स को मैनिफ़ेस्ट में लिखना (Correct Manifest Entry)
-          # यहाँ हम कम्युनिटी के सबसे स्थिर सोर्स का पाथ जोड़ रहे हैं
+          # 3. एक्टिव और पब्लिक रिपॉजिटरीज को मैनिफ़ेस्ट में लिखना
           cat <<EOF > .repo/local_manifests/roomservice.xml
           <?xml version="1.0" encoding="UTF-8"?>
           <manifest>
-            <project name="Halium-Xiaomi-MT6833/android_device_xiaomi_evergo" path="device/xiaomi/evergo" remote="github" revision="halium-11" />
-            <project name="Halium-Xiaomi-MT6833/android_kernel_xiaomi_evergo" path="kernel/xiaomi/evergo" remote="github" revision="halium-11" />
+            <project name="gofunstyle/android_device_xiaomi_evergo" path="device/xiaomi/evergo" remote="github" revision="android-11" />
+            <project name="gofunstyle/android_kernel_xiaomi_evergo" path="kernel/xiaomi/evergo" remote="github" revision="android-11" />
           </manifest>
           EOF
           
-          echo "Syncing all source code with proper manifests..."
-          repo sync -c -j$(nproc --all) --force-sync --no-clone-bundle --no-tags
+          echo "Syncing all source code with working manifests..."
+          # नेटवर्क एरर से बचने के लिए --force-sync और -j4 का उपयोग किया गया है
+          repo sync -c -j4 --force-sync --no-clone-bundle --no-tags
 
       - name: Build Halium Boot
         run: |
           cd halium
           source build/envsetup.sh
           
-          # सही लंच कमांड टारगेट करना
+          # लंच कमांड टारगेट करना
           lunch halium_evergo-userdebug || lunch aosp_evergo-userdebug
           
           make halium-boot -j$(nproc --all)
