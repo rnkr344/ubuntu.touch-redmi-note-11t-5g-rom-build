@@ -67,7 +67,19 @@ jobs:
       run: |
         cd ${{ github.workspace }}/halium
         
-        # 1. डिवाइस ट्री पैचिंग प्रक्रिया
+        # 1. वेंडर ट्री पैचिंग प्रक्रिया (New Fix)
+        if [ -d vendor/xiaomi/evergo ]; then
+          cd vendor/xiaomi/evergo
+          # अगर evergo-vendor.mk गायब है तो everpal-vendor.mk का इस्तेमाल करें
+          if [ ! -f evergo-vendor.mk ] && [ -f everpal-vendor.mk ]; then
+            cp everpal-vendor.mk evergo-vendor.mk
+          fi
+          # वेंडर फ़ाइलों के अंदर भी नाम दुरुस्त करें
+          find . -type f -name "*.mk" -exec sed -i 's/everpal/evergo/g' {} +
+          cd ${{ github.workspace }}/halium
+        fi
+        
+        # 2. डिवाइस ट्री पैचिंग प्रक्रिया
         cd device/xiaomi/evergo
         
         # मुख्य मेकफ़ाइल का बैकअप और निर्माण
@@ -90,15 +102,15 @@ jobs:
         find . -type f -name "*.mk" -exec sed -i 's/lineage_evergo/halium_evergo/g' {} +
         find . -type f -name "*.mk" -exec sed -i 's/everpal/evergo/g' {} +
         
-        # 🚨 एरर फिक्स पैच: गायब 'sepolicy_vndr' वाली लाइन को रिमूव/कमेंट करना ताकि एरर न आए
-        find . -type f -name "*.mk" -exec sed -i 's|.*device/mediatek/sepolicy_vndr/SEPolicy.mk.*|# mediatek sepolicy bypassed|g' {} +
+        # गायब 'sepolicy_vndr' वाली एरर का बाईपास
+        find . -type f -name "*.mk" -exec sed -i 's|.*device/mediatek/sepolicy_vndr/SEPolicy.mk.*|# mt9629 sepolicy bypassed|g' {} +
         
         # AndroidProducts.mk को री-लिंक करना
         if [ -f AndroidProducts.mk ]; then
           sed -i 's/\$(LOCAL_DIR)\/.*\.mk/\$(LOCAL_DIR)\/halium_evergo.mk/g' AndroidProducts.mk
         fi
         
-        # 2. बिल्ड एनवायरनमेंट सेट करके लंच और कंपाइल करना
+        # 3. बिल्ड प्रक्रिया शुरू करना
         cd ${{ github.workspace }}/halium
         export USE_CCACHE=1
         export CCACHE_EXEC=/usr/bin/ccache
