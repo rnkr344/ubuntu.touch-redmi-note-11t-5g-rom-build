@@ -5,7 +5,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04 # यह रनर जल्दी मिलता है और कतार में नहीं फंसता
     steps:
     - name: Checkout Repository
       uses: actions/checkout@v4
@@ -50,6 +50,7 @@ jobs:
         cd ${{ github.workspace }}/halium
         mkdir -p .repo/local_manifests
         
+        # यहाँ आपकी रिपॉजिटरी के सही नाम सेट कर दिए गए हैं
         cat <<EOF > .repo/local_manifests/evergo.xml
         <?xml version="1.0" encoding="UTF-8"?>
         <manifest>
