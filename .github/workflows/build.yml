@@ -38,7 +38,7 @@ jobs:
           chmod a+x ~/bin/repo
           sudo ln -sf ~/bin/repo /usr/bin/repo
 
-      # स्टेप 6: सुरक्षित डाउनलोड मोड (बिना बाहरी त्रुटिपूर्ण रिपॉजिटरी के)
+      # स्टेप 6: बिल्कुल सटीक और शुद्ध repo sync कमांड के साथ
       - name: Download Halium 11 Source Code
         run: |
           mkdir -p halium
@@ -48,15 +48,15 @@ jobs:
           repo init -u https://github.com/Halium/android -b halium-11.0 --depth=1
           
           echo "Syncing core Halium 11 source code..."
-          # -force-sync और --ignore-missing-projects का उपयोग किया गया है ताकि कोई प्रोजेक्ट गायब होने पर सिंक न रुके
-          repo sync -c -j4 --force-sync --no-clone-bundle --no-tags --ignore-missing-projects
+          # गलत फ्लैग हटाकर मानक (Standard) स्टेबल फ्लैग्स का उपयोग किया गया है
+          repo sync -c -j4 --force-sync --no-clone-bundle --no-tags
 
       - name: Build Halium Boot
         run: |
           cd halium
           source build/envsetup.sh
           
-          # यदि डिवाइस ट्री गायब है, तो जेनेरिक aosp आर्म64 आर्किटेक्चर पर लंच का प्रयास करें
+          # जेनेरिक आर्म64 आर्किटेक्चर पर लंच का प्रयास करें
           lunch aosp_arm64-userdebug || lunch halium_arm64-userdebug
           
           # जेनेरिक बूट इमेज कंपाइल करें
