@@ -67,30 +67,31 @@ jobs:
       run: |
         cd ${{ github.workspace }}/halium
         
-        # 1. डिवाइस ट्री पैचिंग और रीनेमिंग प्रक्रिया
+        # 1. डिवाइस ट्री पैचिंग प्रक्रिया
         cd device/xiaomi/evergo
         
-        # अगर arrow_everpal.mk जैसी कोई मुख्य फ़ाइल है, उसे पहले बैकअप लें
+        # मुख्य मेकफ़ाइल का बैकअप और निर्माण
         find . -maxdepth 1 -name "*.mk" ! -name "Android*" ! -name "CleanSpec*" -exec cp {} halium_evergo.mk \; 2>/dev/null || true
         
-        # एरर फिक्स: अगर device.mk मौजूद नहीं है, तो उपलब्ध मेकफाइल को ही device.mk बना दें
         if [ ! -f device.mk ]; then
           if [ -f evergo.mk ]; then
             cp evergo.mk device.mk
           elif [ -f everpal.mk ]; then
             cp everpal.mk device.mk
           else
-            # अगर कोई विशिष्ट नाम नहीं मिलता, तो बैकअप फ़ाइल का ही उपयोग करें
             cp halium_evergo.mk device.mk
           fi
         fi
         
-        # सभी फाइलों के अंदर पुराने कोडनेम और ओएस प्रविष्टियों को 'halium_evergo' से बदलना
+        # सभी फाइलों के अंदर पुराने कोडनेम रिप्लेस करना
         find . -type f -name "*.mk" -exec sed -i 's/arrow_everpal/halium_evergo/g' {} +
         find . -type f -name "*.mk" -exec sed -i 's/lineage_everpal/halium_evergo/g' {} +
         find . -type f -name "*.mk" -exec sed -i 's/arrow_evergo/halium_evergo/g' {} +
         find . -type f -name "*.mk" -exec sed -i 's/lineage_evergo/halium_evergo/g' {} +
         find . -type f -name "*.mk" -exec sed -i 's/everpal/evergo/g' {} +
+        
+        # 🚨 एरर फिक्स पैच: गायब 'sepolicy_vndr' वाली लाइन को रिमूव/कमेंट करना ताकि एरर न आए
+        find . -type f -name "*.mk" -exec sed -i 's|.*device/mediatek/sepolicy_vndr/SEPolicy.mk.*|# mediatek sepolicy bypassed|g' {} +
         
         # AndroidProducts.mk को री-लिंक करना
         if [ -f AndroidProducts.mk ]; then
