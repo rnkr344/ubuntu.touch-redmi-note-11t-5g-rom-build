@@ -1,42 +1,43 @@
 name: Ubuntu Touch Halium 11 Build for Redmi Note 11T 5G
 
 on:
-  workflow_dispatch: # इसे आप GitHub Actions टैब से मैनुअली रन कर सकते हैं
+  workflow_dispatch: # इसे आप GitHub UI से जब चाहें मैन्युअली रन कर सकते हैं
 
 jobs:
   build:
-    runs-on: ubuntu-20.04
+    # रनर समस्या को ठीक करने के लिए ubuntu-latest का उपयोग किया गया है
+    runs-on: ubuntu-latest
     permissions:
       contents: write
 
     steps:
-      # स्टेप 1: अपनी रिपॉजिटरी के कोड को रनर पर लाना
+      # स्टेप 1: आपके रिपॉजिटरी के कोड को GitHub रनर पर क्लोन/चेकआउट करना
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # स्टेप 2: गिट कॉन्फ़िगर करना (Repo टूल के लिए ज़रूरी है)
+      # स्टेप 2: Git को कॉन्फ़िगर करना (यह 'repo' टूल के काम करने के लिए ज़रूरी है)
       - name: Configure Git
         run: |
           git config --global user.name "GitHub Action"
           git config --global user.email "action@github.com"
 
-      # स्टेप 3: डिस्क स्पेस खाली करना (Maximize Disk Space)
-      - name: Free Disk Space (Clean Runner)
+      # स्टेप 3: GitHub सर्वर से गैर-ज़रूरी फाइल्स डिलीट करके 30GB+ स्पेस खाली करना
+      - name: Free Disk Space (Maximize Storage)
         run: |
           sudo rm -rf /usr/share/dotnet
           sudo rm -rf /usr/local/lib/android
           sudo rm -rf /opt/ghc
           sudo rm -rf /usr/share/swift
-          echo "Disks space after cleanup:"
+          echo "Disk space after cleanup:"
           df -h
 
-      # स्टेप 4: बिल्ड के लिए ज़रूरी टूल्स और डिपेंडेंसीज इंस्टॉल करना
+      # स्टेप 4: Ubuntu पर Android/Halium कंपाइल करने के लिए सभी आवश्यक टूल्स डालना
       - name: Install Build Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y git-core gnupg flex bison gperf build-essential zip curl zlib1g-dev gcc-multilib g++-multilib libc6-dev-i386 lib32ncurses5-dev x11proto-core-dev libx11-dev lib32z-dev ccache libgl1-mesa-dev libxml2-utils xsltproc unzip python3 bc
+          sudo apt-get install -y git-core gnupg flex bison gperf build-essential zip curl zlib1g-dev gcc-multilib g++-multilib libc6-dev-i386 lib32ncurses5-dev x11proto-core-dev libx11-dev lib32z-dev ccache libgl1-mesa-dev libxml2-utils xsltproc unzip python3 bc rs_sync libssl-dev
 
-      # स्टेप 5: Google Repo टूल को इंस्टॉल करना
+      # स्टेप 5: Google का 'repo' टूल इंस्टॉल करना (Android सोर्स मैनेज करने के लिए)
       - name: Install Google Repo Tool
         run: |
           mkdir -p ~/bin
@@ -44,35 +45,35 @@ jobs:
           chmod a+x ~/bin/repo
           sudo ln -sf ~/bin/repo /usr/bin/repo
 
-      # स्टेप 6: Halium 11 सोर्स कोड को इनिशियलाइज़ और सिंक करना
+      # स्टेप 6: Halium 11 का मुख्य सोर्स कोड इनिशियलाइज़ और डाउनलोड करना
       - name: Download Halium 11 Source Code
         run: |
           mkdir -p halium
           cd halium
-          # Halium 11 का मुख्य मैनिफ़ेस्ट इनिशियलाइज़ करें
+          # Halium 11 का मैनिफ़ेस्ट सेट करना
           repo init -u https://github.com/Halium/android -b halium-11.0 --depth=1
           
-          # यहाँ अपने Redmi Note 11T 5G के डिवाइस ट्री जोड़ने का कोड लिखें (यदि कोई लोकल मैनिफ़ेस्ट है)
-          # उदाहरण: कर्नल और डिवाइस सोर्स सिंक करना
+          # नोट: यदि आपके पास अपना लोकल मैनिफ़ेस्ट (Redmi Note 11T ट्री) है, तो उसे यहाँ क्लोन करें:
+          # उदाहरण: git clone https://github.com/your-username/local_manifests .repo/local_manifests
           
           echo "Syncing source code..."
           repo sync -c -j$(nproc --all) --force-sync --no-clone-bundle --no-tags
 
-      # स्टेप 7: कर्नल और हलियम बूट इमेज का निर्माण (Build Process)
+      # स्टेप 7: एनवायरनमेंट सेट करके कर्नल और बूट इमेज का निर्माण करना
       - name: Build Halium Boot
         run: |
           cd halium
-          # एनवायरनमेंट सेटअप स्क्रिप्ट को सोर्स करें
+          # बिल्ड एनवायरनमेंट स्क्रिप्ट लोड करें
           source build/envsetup.sh
           
-          # अपने डिवाइस (evergo) के लिए लंच (lunch) कमांड रन करें
-          # नोट: यदि आपका डिवाइस नाम अलग है तो 'evergo' को बदलें
+          # अपने डिवाइस (evergo/opal) के लिए लंच सेटअप करें
+          # यदि आपके डिवाइस का सटीक लंच कॉम्बो अलग है तो इसे बदल सकते हैं
           lunch halium_evergo-userdebug || lunch aosp_evergo-userdebug
           
-          # बूट इमेज और कर्नल बिल्ड करें
+          # कर्नल और बूट इमेज कंपाइल करें
           make halium-boot -j$(nproc --all)
 
-      # स्टेप 8: बनी हुई इमेजेस (.img) को GitHub पर अपलोड करना
+      # स्टेप 8: तैयार हुई आउटपुट इमेजेस (.img) को सुरक्षित डाउनलोड के लिए अपलोड करना
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
