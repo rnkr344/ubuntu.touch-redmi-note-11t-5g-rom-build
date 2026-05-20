@@ -43,19 +43,29 @@ jobs:
         run: |
           mkdir -p halium
           cd halium
-          # मुख्य हैलियम 11 बेस सोर्स को इनिशियलाइज करना (बिना किसी अप्रचलित फ्लैग के)
+          # मुख्य हैलियम 11 बेस सोर्स को इनिशियलाइज करना
           repo init -u https://github.com/Halium/android -b halium-11.0 --depth=1
           echo "Syncing core Halium 11 source code..."
           repo sync -c -j$(nproc --all) --force-sync --no-clone-bundle --no-tags
 
-      - name: Patch Lineage Soong Bug (Master Model Patch)
+      - name: Clone Redmi Note 11T 5G Device Sources
+        run: |
+          cd halium
+          echo "Cloning device specific trees..."
+          # ध्यान दें: यदि आपके पास अपना काम करने वाला डिवाइस ट्री है, तो नीचे दी गई लाइनों को अन-कमेंट (# हटाएं) करें और सही URL डालें।
+          # git clone https://github.com/your-username/android_device_xiaomi_evergo.git -b halium-11.0 device/xiaomi/evergo
+          # git clone https://github.com/your-username/android_kernel_xiaomi_evergo.git -b halium-11.0 kernel/xiaomi/evergo
+
+      - name: Patch Lineage Soong Bug (Safe Model Patch)
         run: |
           cd halium
           if [ -f vendor/lineage/build/soong/Android.bp ]; then
-            echo "Applying final command block patch to neutralize uninitialized kernel variables..."
-            # यह कमांड सोोंग के कर्नल वेरिएबल वाले एरर लूप को पूरी तरह समाप्त कर देगी
-            sed -i 's/cmd: .*/cmd: "echo Skipping inline kernel headers",/g' vendor/lineage/build/soong/Android.bp
-            echo "पैच सफलतापूर्वक लागू किया गया!"
+            echo "Applying targeted safety patch to Lineage Soong instead of generic sed..."
+            
+            # पुराना बूटस्ट्रैप तोड़ने वाला 'sed' हटा दिया गया है। 
+            # अब हम कर्नल हेडर की डिपेंडेंसी एरर को रोकने के लिए पर्यावरण वेरिएबल्स और कॉन्फ़िगरेशन का उपयोग करेंगे।
+            echo "TARGET_HAS_LEGACY_KERNEL_HEADERS := true" >> build/core/config.mk
+            echo "पैच सुरक्षित रूप से कॉन्फ़िगरेशन फ़ाइल में जोड़ दिया गया है!"
           else
             echo "Warning: Lineage Soong file not found, skipping patch."
           fi
@@ -64,10 +74,22 @@ jobs:
         run: |
           cd halium
           source build/envsetup.sh
-          # जेनेरिक आर्म64 आर्किटेक्चर पर लंच (Lunch) का प्रयास
+          
+          # कम रैम (15.6GB) के कारण पर्यावरण को अनुकूलित करना ताकि कंपाइलर आउट ऑफ मेमोरी न हो
+          export SOONG_ALLOW_MISSING_DEPENDENCIES=true
+          export MAX_ARG_STRLEN=131072
+          
+          # आधी कोर का उपयोग करना ताकि रैम क्रैश (Segfault) से बचा जा सके
+          BUILD_THREADS=$(expr $(nproc) / 2)
+          if [ $BUILD_THREADS -le 0 ]; then BUILD_THREADS=1; fi
+          
+          echo "Using $BUILD_THREADS threads for build to safely manage 16GB RAM limit..."
+
+          # जेनेरिक आर्म64 आर्किटेक्चर पर लंच का प्रयास (या अपने डिवाइस का नाम डालें जैसे: halium_evergo-userdebug)
           lunch aosp_arm64-userdebug || lunch halium_arm64-userdebug
-          # जेनेरिक बूट इमेज कंपाइल करना
-          make halium-boot -j$(nproc --all) || make bootimage -j$(nproc --all)
+          
+          # सुरक्षित थ्रेड्स के साथ इमेज कंपाइल करना
+          make halium-boot -j${BUILD_THREADS} || make bootimage -j${BUILD_THREADS}
 
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
