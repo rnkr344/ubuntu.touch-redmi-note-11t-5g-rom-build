@@ -50,11 +50,11 @@ jobs:
         run: |
           cd halium
           if [ -f vendor/lineage/build/soong/Android.bp ]; then
-            echo "Patching vendor/lineage/build/soong/Android.bp..."
-            # $(PATH_OVERRIDE_SOONG) को हटाएं
+            echo "Patching Lineage Soong variables dynamically..."
+            # पिछले और नए सभी पुराने वेरिएबल्स ($(PATH_OVERRIDE_SOONG), $(KERNEL_MAKE_CMD), $(KERNEL_MAKE_FLAGS)) को हटाकर मेक को क्लीन करना
             sed -i 's/\$(PATH_OVERRIDE_SOONG)//g' vendor/lineage/build/soong/Android.bp
-            # $(KERNEL_MAKE_CMD) को हटाकर स्टैंडर्ड 'make' से बदलें ताकि बिल्ड फेल न हो
             sed -i 's/\$(KERNEL_MAKE_CMD)/make/g' vendor/lineage/build/soong/Android.bp
+            sed -i 's/\$(KERNEL_MAKE_FLAGS)//g' vendor/lineage/build/soong/Android.bp
           else
             echo "Warning: Lineage Soong file not found, skipping patch."
           fi
