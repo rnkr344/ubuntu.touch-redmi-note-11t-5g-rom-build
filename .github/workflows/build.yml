@@ -42,30 +42,28 @@ jobs:
         run: |
           mkdir -p halium
           cd halium
-          # मुख्य हलियम 11 बेस सोर्स को इनिशियलाइज करना
           repo init -u https://github.com/Halium/android -b halium-11.0 --depth=1
           echo "Syncing core Halium 11 source code..."
-          # सबसे सुरक्षित और मानक (Standard) सिंक कमांड
           repo sync -c -j$(nproc --all) --force-sync --no-clone-bundle --no-tags
 
       - name: Patch Lineage Soong Bug
         run: |
           cd halium
-          # 'PATH_OVERRIDE_SOONG' एरर को ठीक करने के लिए फ़ाइल को ऑटो-पैच करना
           if [ -f vendor/lineage/build/soong/Android.bp ]; then
             echo "Patching vendor/lineage/build/soong/Android.bp..."
+            # $(PATH_OVERRIDE_SOONG) को हटाएं
             sed -i 's/\$(PATH_OVERRIDE_SOONG)//g' vendor/lineage/build/soong/Android.bp
+            # $(KERNEL_MAKE_CMD) को हटाकर स्टैंडर्ड 'make' से बदलें ताकि बिल्ड फेल न हो
+            sed -i 's/\$(KERNEL_MAKE_CMD)/make/g' vendor/lineage/build/soong/Android.bp
           else
-            echo "Warning: Lineage Soong file not found yet, skipping patch."
+            echo "Warning: Lineage Soong file not found, skipping patch."
           fi
 
       - name: Build Halium Boot
         run: |
           cd halium
           source build/envsetup.sh
-          # जेनेरिक आर्म64 आर्किटेक्चर पर लंच का प्रयास करें
           lunch aosp_arm64-userdebug || lunch halium_arm64-userdebug
-          # जेनेरिक बूट इमेज कंपाइल करें
           make halium-boot -j$(nproc --all) || make bootimage -j$(nproc --all)
 
       - name: Upload Build Artifacts
