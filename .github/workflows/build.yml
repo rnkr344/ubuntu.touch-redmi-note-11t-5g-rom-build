@@ -56,7 +56,7 @@ jobs:
           echo "Cloning device specific trees..."
           # मूल निर्देशानुसार यह सेक्शन पूरी तरह सुरक्षित रखा गया है
           # git clone https://github.com/rnkr344/device_xiaomi_evergo_tree_11t_5g.git -b halium-11.0 device_xiaomi_evergo_tree_11t_5g
-          # git clone https://github.com/rnkr344/kernel_xiaomi_evergo_tree_11t_5g.git -b halium-11.0 kernel/xiaomi/evergo_tree_11t_5g
+          # git clone https://github.com/rnkr344/kernel_xiaomi_evergo_tree_11t_5g.git -b halium-11.0 kernel_xiaomi_evergo_tree_11t_5g
 
       - name: Patch Lineage Soong Bug (Robust Neutralization Patch)
         run: |
